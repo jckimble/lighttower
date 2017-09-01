@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./cmd"
 	"fmt"
+	"github.com/jckimble/lighttower/cmd"
 	"os"
 )
 
