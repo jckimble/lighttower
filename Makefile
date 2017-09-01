@@ -7,7 +7,7 @@ lighttower:
 clean:
 	rm -f lighttower
 
-release:
+release: lighttower
 	go get github.com/itchio/gothub
 	~/go/bin/gothub release --user jckimble --repo lighttower --tag $(VERSION) --name "Automatic Release $(VERSION)" --description ""
 	~/go/bin/gothub upload --user jckimble --repo lighttower --tag $(VERSION) --name "lighttower-linux-amd64" --file ./lighttower-linux-amd64
