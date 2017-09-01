@@ -31,7 +31,7 @@ func (c *CodeShip) GetToken() error {
 	if err != nil {
 		return err
 	}
-	req.Header.Add("content-type", "text/plain")
+	req.Header.Add("content-type", "application/json")
 	req.Header.Add("authorization", "Basic "+c.AuthString)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -66,6 +66,7 @@ func (c *CodeShip) getProjects(uuid string) error {
 	if err != nil {
 		return err
 	}
+	req.Header.Add("content-type", "application/json")
 	req.Header.Add("authorization", c.AccessToken)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -98,6 +99,7 @@ func (c *CodeShip) getBuilds(org, project, name string) error {
 	if err != nil {
 		return err
 	}
+	req.Header.Add("content-type", "application/json")
 	req.Header.Add("authorization", c.AccessToken)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
