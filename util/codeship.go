@@ -22,6 +22,7 @@ type Build struct {
 	ProjectUUID      string `json:"project_uuid"`
 	OrganizationUUID string `json:"organization_uuid"`
 	Status           string `json:"status"`
+	Type             string
 	FinishedAt       time.Time
 	LastCheck        time.Time
 }
@@ -87,14 +88,14 @@ func (c *CodeShip) getProjects(uuid string) error {
 	projects := m["projects"].([]interface{})
 	for _, project := range projects {
 		p := project.(map[string]interface{})
-		err = c.getBuilds(p["organization_uuid"].(string), p["uuid"].(string), p["name"].(string))
+		err = c.getBuilds(p["organization_uuid"].(string), p["uuid"].(string), p["name"].(string), p["type"].(string))
 		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
-func (c *CodeShip) getBuilds(org, project, name string) error {
+func (c *CodeShip) getBuilds(org, project, name, cstype string) error {
 	url := "https://api.codeship.com/v2/organizations/" + org + "/projects/" + project + "/builds?per_page=1"
 	payload := strings.NewReader("{}")
 	req, err := http.NewRequest("GET", url, payload)
@@ -125,6 +126,88 @@ func (c *CodeShip) getBuilds(org, project, name string) error {
 			status := b["status"].(string)
 			project := b["project_uuid"].(string)
 			org := b["organization_uuid"].(string)
+			if cstype == "basic" {
+				err := c.getPipeline(org, project, uuid, name)
+				if err != nil {
+					return err
+				}
+			} else if cstype == "pro" {
+				if c.Builds[name] == nil {
+					c.Builds[name] = &Build{
+						UUID:             uuid,
+						ProjectName:      name,
+						ProjectUUID:      project,
+						OrganizationUUID: org,
+						Status:           status,
+						LastCheck:        time.Now(),
+						Type:             cstype,
+					}
+					if b["finished_at"] != nil {
+						finished_at := b["finished_at"].(string)
+						finished, err := time.Parse(time.RFC3339, finished_at)
+						if err != nil {
+							return err
+						}
+						c.Builds[name].FinishedAt = finished
+					}
+				} else if c.Builds[name].UUID != uuid || (c.Builds[name].UUID == uuid && c.Builds[name].Status != status) {
+					c.Builds[name].UUID = uuid
+					c.Builds[name].Type = cstype
+					c.Builds[name].Status = status
+					c.Builds[name].LastCheck = time.Now()
+					if b["finished_at"] != nil {
+						finished_at := b["finished_at"].(string)
+						finished, err := time.Parse(time.RFC3339, finished_at)
+						if err != nil {
+							return err
+						}
+						c.Builds[name].FinishedAt = finished
+					}
+					c.CallBack(name, status)
+				}
+			} else {
+				return fmt.Errorf("New Codeship Type: %s", cstype)
+			}
+		}
+	} else if res.StatusCode == 401 {
+		err = c.GetToken()
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("Codeship Error: %s", m["error_message"])
+	}
+	return nil
+}
+
+func (c *CodeShip) getPipeline(org, project, uuid, name string) error {
+	url := "https://api.codeship.com/v2/organizations/" + org + "/projects/" + project + "/builds/" + uuid + "/pipelines"
+	payload := strings.NewReader("{}")
+	req, err := http.NewRequest("GET", url, payload)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("content-type", "application/json")
+	req.Header.Add("authorization", c.AccessToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+	m := map[string]interface{}{}
+	err = json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	if res.StatusCode == 200 {
+		pipelines := m["pipelines"].([]interface{})
+		for _, pipeline := range pipelines {
+			p := pipeline.(map[string]interface{})
+			status := p["status"].(string)
 			if c.Builds[name] == nil {
 				c.Builds[name] = &Build{
 					UUID:             uuid,
@@ -133,9 +216,10 @@ func (c *CodeShip) getBuilds(org, project, name string) error {
 					OrganizationUUID: org,
 					Status:           status,
 					LastCheck:        time.Now(),
+					Type:             "basic",
 				}
-				if b["finished_at"] != nil {
-					finished_at := b["finished_at"].(string)
+				if p["finished_at"] != nil {
+					finished_at := p["finished_at"].(string)
 					finished, err := time.Parse(time.RFC3339, finished_at)
 					if err != nil {
 						return err
@@ -144,10 +228,11 @@ func (c *CodeShip) getBuilds(org, project, name string) error {
 				}
 			} else if c.Builds[name].UUID != uuid || (c.Builds[name].UUID == uuid && c.Builds[name].Status != status) {
 				c.Builds[name].UUID = uuid
+				c.Builds[name].Type = "basic"
 				c.Builds[name].Status = status
 				c.Builds[name].LastCheck = time.Now()
-				if b["finished_at"] != nil {
-					finished_at := b["finished_at"].(string)
+				if p["finished_at"] != nil {
+					finished_at := p["finished_at"].(string)
 					finished, err := time.Parse(time.RFC3339, finished_at)
 					if err != nil {
 						return err
@@ -195,7 +280,7 @@ func (c *CodeShip) PollChanges() {
 						continue
 					}
 				}
-				err := c.getBuilds(build.OrganizationUUID, build.ProjectUUID, build.ProjectName)
+				err := c.getBuilds(build.OrganizationUUID, build.ProjectUUID, build.ProjectName, build.Type)
 				if err != nil {
 					log.Println(err)
 				}
