@@ -5,7 +5,7 @@ import (
 	"github.com/godbus/dbus"
 )
 
-func sendNotify(image, name, status string) error {
+func SendNotify(image, name, status string) error {
 	conn, err := dbus.SessionBus()
 	if err != nil {
 		return err

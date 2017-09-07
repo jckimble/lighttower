@@ -20,6 +20,12 @@ var watchCmd = &cobra.Command{
 func init() {
 	watchCmd.Flags().StringP("auth", "a", "", "Codeship authstring")
 	viper.BindPFlag("auth", watchCmd.Flags().Lookup("auth"))
+
+	viper.SetDefault("SuccessImage", "dialog-information")
+	viper.SetDefault("SuccessMessage", "Build Successful")
+	viper.SetDefault("ErrorImage", "dialog-error")
+	viper.SetDefault("ErrorMessage", "Build Failed")
+	viper.SetDefault("Debug", false)
 	RootCmd.AddCommand(watchCmd)
 }
 
@@ -31,11 +37,23 @@ func validate(cmd *cobra.Command, args []string) error {
 	}
 	return nil
 }
-
+func notify(name, status string) {
+	if viper.GetBool("Debug") {
+		log.Printf("Codeship returned status: %s\n", status)
+	}
+	if status == "success" {
+		util.SendNotify(viper.GetString("SuccessImage"), name, viper.GetString("SuccessMessage"))
+	} else if status == "error" {
+		util.SendNotify(viper.GetString("ErrorImage"), name, viper.GetString("ErrorMessage"))
+	} else if status != "testing" && !viper.GetBool("Debug") {
+		log.Printf("Codeship returned status: %s\n", status)
+	}
+}
 func start(cmd *cobra.Command, args []string) {
 	codeship := util.CodeShip{
 		AuthString: viper.GetString("auth"),
 		Builds:     map[string]*util.Build{},
+		CallBack:   notify,
 	}
 	err := codeship.GetToken()
 	if err != nil {

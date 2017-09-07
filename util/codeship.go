@@ -13,6 +13,7 @@ type CodeShip struct {
 	AuthString  string
 	AccessToken string
 	Builds      map[string]*Build
+	CallBack    func(name, status string)
 }
 type Build struct {
 	UUID             string `json:"uuid"`
@@ -152,13 +153,7 @@ func (c *CodeShip) getBuilds(org, project, name string) error {
 					}
 					c.Builds[name].FinishedAt = finished
 				}
-				if status == "success" {
-					sendNotify("", name, "Build Successful")
-				} else if status == "error" {
-					sendNotify("", name, "Build Failed")
-				} else if status != "testing" {
-					fmt.Println(status)
-				}
+				c.CallBack(name, status)
 			}
 		}
 	} else if res.StatusCode == 401 {
