@@ -42,9 +42,15 @@ func notify(name, status string) {
 		log.Printf("Codeship returned status: %s\n", status)
 	}
 	if status == "success" {
-		util.SendNotify(viper.GetString("SuccessImage"), name, viper.GetString("SuccessMessage"))
+		err := util.SendNotify(viper.GetString("SuccessImage"), name, viper.GetString("SuccessMessage"))
+		if err != nil {
+			log.Printf("Unable to send Notification: %s", err)
+		}
 	} else if status == "error" {
-		util.SendNotify(viper.GetString("ErrorImage"), name, viper.GetString("ErrorMessage"))
+		err := util.SendNotify(viper.GetString("ErrorImage"), name, viper.GetString("ErrorMessage"))
+		if err != nil {
+			log.Printf("Unable to send Notification: %s", err)
+		}
 	} else if status != "testing" && !viper.GetBool("Debug") {
 		log.Printf("Codeship returned status: %s\n", status)
 	}

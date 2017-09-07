@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -194,7 +195,10 @@ func (c *CodeShip) PollChanges() {
 						continue
 					}
 				}
-				c.getBuilds(build.OrganizationUUID, build.ProjectUUID, build.ProjectName)
+				err := c.getBuilds(build.OrganizationUUID, build.ProjectUUID, build.ProjectName)
+				if err != nil {
+					log.Println(err)
+				}
 			}
 		}
 	}
