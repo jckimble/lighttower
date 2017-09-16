@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/jckimble/lighttower/util"
+	homedir "github.com/mitchellh/go-homedir"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,9 +24,10 @@ func init() {
 
 	viper.SetDefault("SuccessImage", "dialog-information")
 	viper.SetDefault("SuccessMessage", "Build Successful")
+	viper.SetDefault("SuccessSound", "")
 	viper.SetDefault("ErrorImage", "dialog-error")
 	viper.SetDefault("ErrorMessage", "Build Failed")
-	viper.SetDefault("Debug", false)
+	viper.SetDefault("ErrorSound", "")
 	RootCmd.AddCommand(watchCmd)
 }
 
@@ -38,20 +40,25 @@ func validate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 func notify(name, status string) {
-	if viper.GetBool("Debug") {
-		log.Printf("Codeship returned status: %s\n", status)
-	}
 	if status == "success" {
-		err := util.SendNotify(viper.GetString("SuccessImage"), name, viper.GetString("SuccessMessage"))
+		sound, err := homedir.Expand(viper.GetString("SuccessSound"))
+		if err != nil {
+			sound = viper.GetString("SuccessSound")
+		}
+		err = util.SendNotify(viper.GetString("SuccessImage"), name, viper.GetString("SuccessMessage"), sound)
 		if err != nil {
 			log.Printf("Unable to send Notification: %s", err)
 		}
 	} else if status == "error" {
-		err := util.SendNotify(viper.GetString("ErrorImage"), name, viper.GetString("ErrorMessage"))
+		sound, err := homedir.Expand(viper.GetString("ErrorSound"))
+		if err != nil {
+			sound = viper.GetString("ErrorSound")
+		}
+		err = util.SendNotify(viper.GetString("ErrorImage"), name, viper.GetString("ErrorMessage"), sound)
 		if err != nil {
 			log.Printf("Unable to send Notification: %s", err)
 		}
-	} else if status != "testing" && !viper.GetBool("Debug") {
+	} else {
 		log.Printf("Codeship returned status: %s\n", status)
 	}
 }

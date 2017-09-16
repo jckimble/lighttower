@@ -3,6 +3,10 @@ Light Tower
 
 Tool to watch codeship builds and send dbus notifications
 
+Note
+----
+LightTower will not be v1 until codeship's v2 api is finalized, expect rapid version changes up to that time, until then all feature request will be considered so don't be afraid to ask or contribute.
+
 Installation
 ------------
 ```
@@ -16,6 +20,18 @@ Usage
 ```
 lighttower create -u [username] -p [password]
 lighttower watch
+```
+
+Config (~/.lighttower.yaml)
+-------
+```
+auth: (basic auth string)
+SuccessImage: (can be image path or dbus image)
+SuccessMessage: (message you want echoed on successful build)
+SuccessSound: (can be sound path or dbus sound)
+ErrorImage: (can be image path or dbus image)
+ErrorMessage: (message you want echoed on failed build)
+ErrorSound: (can be sound path or dbus sound)
 ```
 
 License
