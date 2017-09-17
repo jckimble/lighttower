@@ -1,9 +1,13 @@
 package util
 
 import (
+	"bufio"
 	"context"
+	"crypto"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"runtime"
 
@@ -17,13 +21,16 @@ const (
 )
 
 var (
-	ErrorNoBinary = errors.New("no binary for the update found")
+	ErrorNoBinary    = errors.New("no binary for the update found")
+	ErrorNoCheckSum  = errors.New("no checksum for the update found")
+	ErrorNoSignature = errors.New("no signature for the update found")
 )
 
 type Updater struct {
 	CurrentVersion     string // Currently running version.
 	GithubOwner        string // The owner of the repo like "pcdummy"
 	GithubRepo         string // The repository like "go-githubupdate"
+	PublicKey          string
 	latestReleasesResp *github.RepositoryRelease
 }
 
@@ -51,28 +58,85 @@ func (u *Updater) CheckUpdateAvailable() (string, error) {
 
 func (u *Updater) Update() error {
 	reqFilename := u.GithubRepo + "-" + platform
-	var foundAsset github.ReleaseAsset
+	var binaryAsset, checksumAsset, signatureAsset github.ReleaseAsset
 	for _, asset := range u.latestReleasesResp.Assets {
 		if *asset.Name == reqFilename {
-			foundAsset = asset
-			break
+			binaryAsset = asset
+		} else if *asset.Name == "sha256sum.txt" {
+			checksumAsset = asset
+		} else if *asset.Name == reqFilename+".sig" {
+			signatureAsset = asset
 		}
 	}
 
-	if foundAsset.Name == nil {
+	if binaryAsset.Name == nil {
 		return ErrorNoBinary
+	} else if checksumAsset.Name == nil {
+		return ErrorNoCheckSum
+	} else if signatureAsset.Name == nil {
+		return ErrorNoSignature
 	}
 
-	dlURL := *foundAsset.BrowserDownloadURL
+	dlURL := *binaryAsset.BrowserDownloadURL
 
 	resp, err := http.Get(dlURL)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	err = update.Apply(resp.Body, update.Options{})
+	checksum, err := parseChecksum(*checksumAsset.BrowserDownloadURL, reqFilename)
+	if err != nil {
+		return err
+	}
+	opts := update.Options{
+		Checksum: checksum,
+		Hash:     crypto.SHA256,
+	}
+	if u.PublicKey != "" {
+		err = opts.SetPublicKeyPEM([]byte(u.PublicKey))
+		if err != nil {
+			return err
+		}
+		opts.Signature, err = getSignature(*signatureAsset.BrowserDownloadURL)
+		if err != nil {
+			return err
+		}
+		opts.Verifier = update.NewRSAVerifier()
+	}
+	err = update.Apply(resp.Body, opts)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func getSignature(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return ioutil.ReadAll(resp.Body)
+}
+
+func parseChecksum(url, filename string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	scanner := bufio.NewScanner(resp.Body)
+	var sha256, file string
+	for scanner.Scan() {
+		if _, err = fmt.Sscanf(scanner.Text(), "%s %s", &sha256, &file); err != nil {
+			return nil, errors.New("sha256sum.txt appears to be malformed")
+		}
+		if file == filename {
+			return hex.DecodeString(sha256)
+		}
+	}
+	if err = scanner.Err(); err != nil {
+		return nil, err
+	}
+	return nil, errors.New("No checksum avaliable for this system")
 }
