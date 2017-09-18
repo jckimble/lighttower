@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bufio"
 	"context"
 	"crypto"
 	"encoding/hex"
@@ -10,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"runtime"
+	"strings"
 
 	"github.com/blang/semver"
 	"github.com/google/go-github/github"
@@ -62,7 +62,7 @@ func (u *Updater) Update() error {
 	for _, asset := range u.latestReleasesResp.Assets {
 		if *asset.Name == reqFilename {
 			binaryAsset = asset
-		} else if *asset.Name == "sha256sum.txt" {
+		} else if *asset.Name == reqFilename+".sha256" {
 			checksumAsset = asset
 		} else if *asset.Name == reqFilename+".sig" {
 			signatureAsset = asset
@@ -84,7 +84,7 @@ func (u *Updater) Update() error {
 		return err
 	}
 	defer resp.Body.Close()
-	checksum, err := parseChecksum(*checksumAsset.BrowserDownloadURL, reqFilename)
+	checksum, err := parseChecksum(*checksumAsset.BrowserDownloadURL)
 	if err != nil {
 		return err
 	}
@@ -119,24 +119,15 @@ func getSignature(url string) ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
-func parseChecksum(url, filename string) ([]byte, error) {
+func parseChecksum(url string) ([]byte, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	scanner := bufio.NewScanner(resp.Body)
-	var sha256, file string
-	for scanner.Scan() {
-		if _, err = fmt.Sscanf(scanner.Text(), "%s %s", &sha256, &file); err != nil {
-			return nil, errors.New("sha256sum.txt appears to be malformed")
-		}
-		if file == filename {
-			return hex.DecodeString(sha256)
-		}
-	}
-	if err = scanner.Err(); err != nil {
+	sha256, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
 	}
-	return nil, errors.New("No checksum avaliable for this system")
+	return hex.DecodeString(strings.Trim(string(sha256), " \n"))
 }
