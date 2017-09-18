@@ -3,7 +3,10 @@ package util
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -93,7 +96,7 @@ func (u *Updater) Update() error {
 		Hash:     crypto.SHA256,
 	}
 	if u.PublicKey != "" {
-		err = opts.SetPublicKeyPEM([]byte(u.PublicKey))
+		opts.PublicKey, err = getPublicKey(u.PublicKey)
 		if err != nil {
 			return err
 		}
@@ -108,6 +111,16 @@ func (u *Updater) Update() error {
 		return err
 	}
 	return nil
+}
+
+func getPublicKey(key string) (*rsa.PublicKey, error) {
+	block, _ := pem.Decode([]byte(key))
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return cert.PublicKey.(*rsa.PublicKey), nil
+
 }
 
 func getSignature(url string) ([]byte, error) {
