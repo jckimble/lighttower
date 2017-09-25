@@ -1,3 +1,4 @@
-*.swp
-lighttower
-lighttower-linux-amd64
+_site
+.sass-cache
+.jekyll-metadata
+Gemfile.lock
