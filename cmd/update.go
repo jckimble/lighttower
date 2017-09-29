@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/jckimble/lighttower/util"
+	"github.com/jckimble/releasetool/update"
 	"github.com/spf13/cobra"
 )
 
@@ -21,11 +21,11 @@ func init() {
 func startUpdate(cmd *cobra.Command, args []string) {
 	var version string
 	fmt.Sscanf(Version, "v%s", &version)
-	u := &util.Updater{
+	u := &update.GitHub{
 		CurrentVersion: version,
 		GithubOwner:    "jckimble",
 		GithubRepo:     "lighttower",
-		PublicKey: `-----BEGIN CERTIFICATE-----
+		Certificate: `-----BEGIN CERTIFICATE-----
 MIIFcDCCA1igAwIBAgIJAOMTW/DwB0O9MA0GCSqGSIb3DQEBCwUAME0xCzAJBgNV
 BAYTAlVTMRQwEgYDVQQIDAtNaXNzaXNzaXBwaTETMBEGA1UECgwKTGlnaHRUb3dl
 cjETMBEGA1UEAwwKTGlnaHRUb3dlcjAeFw0xNzA5MTcwOTU3MTBaFw0xOTA5MTcw
@@ -65,7 +65,7 @@ MgVN36DSDsVbECniqiRqHYV6B5I1OY6eoQL4K5Ny2z3mDiJ79+T1A8NTfZuktfLt
 
 	if available != "" {
 		log.Printf("Version %s available\n", available)
-		err := u.Update()
+		err := update.Update(u)
 		if err != nil {
 			log.Printf("Unable to Update: %s\n", err)
 		}
